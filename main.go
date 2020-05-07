@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"sync"
 )
 
 const baseURL string = "https://api.tumblr.com/v2/blog/"
@@ -33,6 +34,11 @@ type postsRes struct {
 	Response struct {
 		Posts []postInfo `json:"posts"`
 	} `json:"response"`
+}
+
+type section struct {
+	From int
+	To   int
 }
 
 type postInfo struct {
@@ -74,35 +80,62 @@ func fetchBlog() (blogInfo, error) {
 	return res.Response.Blog, nil
 }
 
-func fetchPosts(offset int) ([]postInfo, error) {
+func fetchPosts(offset int) error {
 	url := baseURL + blogid + "/posts/" + "?notes_info=true&reblog_info=true&offset=" + strconv.Itoa(offset) + "&api_key=" + apikey
 	bytes, err := fetch(url)
 	var res postsRes
 	if err != nil {
-		return res.Response.Posts, err
+		return err
 	}
 	err = json.Unmarshal(bytes, &res)
 	if err != nil {
-		return res.Response.Posts, err
+		return err
 	}
-	return res.Response.Posts, err
-}
-
-func fetchAllPosts(total int) error {
-	offset := 0
-	for offset <= total {
-		posts, err := fetchPosts(offset)
-		if err != nil {
-			return nil
-		}
-		offset += 20
-		for _, post := range posts {
-			if post.ReblogRoot == "" && post.Notes > 0 {
-				fmt.Println(post.Slug)
-			}
+	for _, post := range res.Response.Posts {
+		if post.ReblogRoot == "" && post.Notes > 0 {
+			fmt.Println(offset, post.Slug)
 		}
 	}
 	return nil
+}
+
+func fetchAllPosts(total int) error {
+	sections := makeSections(total, 50)
+	fmt.Println(len(sections))
+	fmt.Println(sections)
+
+	var wg sync.WaitGroup
+	wg.Add(len(sections))
+	for _, section := range sections {
+		fmt.Println(section)
+		offset := section.From
+		go func() {
+			defer wg.Done()
+			for offset <= section.To {
+				err := fetchPosts(offset)
+				if err != nil {
+					fmt.Println(offset)
+				}
+				offset += 20
+			}
+		}()
+	}
+	wg.Wait()
+	return nil
+}
+
+func makeSections(total int, div int) []section {
+	delta := total / div
+	fmt.Println(delta)
+	var sections []section
+	for start := 0; start <= total; start+=delta {
+		end := start+delta-1
+		if end >= total {
+			end = total
+		}
+		sections = append(sections, section{start, end})
+	}
+	return sections
 }
 
 func checkErr(err error) {
