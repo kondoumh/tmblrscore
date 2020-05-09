@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 )
 
 const baseURL string = "https://api.tumblr.com/v2/blog/"
@@ -36,11 +37,6 @@ type postsRes struct {
 	} `json:"response"`
 }
 
-type section struct {
-	From int
-	To   int
-}
-
 type postInfo struct {
 	Type       string `json:"type"`
 	ID         string `json:"id_string"`
@@ -50,6 +46,14 @@ type postInfo struct {
 	Slug       string `json:"slug"`
 	ReblogRoot string `json:"reblogged_root_name"`
 }
+
+type section struct {
+	From int
+	To   int
+}
+
+const delta = 500
+const limit = 20
 
 func fetch(url string) ([]byte, error) {
 	var res *http.Response
@@ -100,36 +104,39 @@ func fetchPosts(offset int) error {
 }
 
 func fetchAllPosts(total int) error {
-	sections := makeSections(total, 50)
+	sections := makeSections(total)
 	fmt.Println(len(sections))
 	fmt.Println(sections)
+
+	start := time.Now()
 
 	var wg sync.WaitGroup
 	wg.Add(len(sections))
 	for _, section := range sections {
 		fmt.Println(section)
-		offset := section.From
-		go func() {
+		go func(start int, end int) {
 			defer wg.Done()
-			for offset <= section.To {
-				err := fetchPosts(offset)
+			for start < end {
+				err := fetchPosts(start)
 				if err != nil {
-					fmt.Println(offset)
+					fmt.Println(start)
 				}
-				offset += 20
+				start += limit
 			}
-		}()
+		}(section.From, section.To)
 	}
 	wg.Wait()
+
+	end := time.Now()
+	fmt.Println(end.Sub(start))
+
 	return nil
 }
 
-func makeSections(total int, div int) []section {
-	delta := total / div
-	fmt.Println(delta)
+func makeSections(total int) []section {
 	var sections []section
-	for start := 0; start <= total; start+=delta {
-		end := start+delta-1
+	for start := 0; start <= total; start += delta {
+		end := start + delta - 1
 		if end >= total {
 			end = total
 		}
