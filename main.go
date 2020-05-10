@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -41,7 +43,7 @@ type postInfo struct {
 	Type       string `json:"type"`
 	ID         string `json:"id_string"`
 	URL        string `json:"post_url"`
-	Date       string `json:"post"`
+	Date       string `json:"date"`
 	Notes      int    `json:"note_count"`
 	Slug       string `json:"slug"`
 	ReblogRoot string `json:"reblogged_root_name"`
@@ -54,6 +56,8 @@ type section struct {
 
 const delta = 500
 const limit = 20
+
+var allPosts []postInfo
 
 func fetch(url string) ([]byte, error) {
 	var res *http.Response
@@ -84,26 +88,28 @@ func fetchBlog() (blogInfo, error) {
 	return res.Response.Blog, nil
 }
 
-func fetchPosts(offset int) error {
+func fetchPosts(offset int) ([]postInfo, error) {
 	url := baseURL + blogid + "/posts/" + "?notes_info=true&reblog_info=true&offset=" + strconv.Itoa(offset) + "&api_key=" + apikey
 	bytes, err := fetch(url)
 	var res postsRes
+	var posts []postInfo
 	if err != nil {
-		return err
+		return posts, err
 	}
 	err = json.Unmarshal(bytes, &res)
 	if err != nil {
-		return err
+		return posts, err
 	}
 	for _, post := range res.Response.Posts {
 		if post.ReblogRoot == "" && post.Notes > 0 {
 			fmt.Println(offset, post.Slug)
+			posts = append(posts, post)
 		}
 	}
-	return nil
+	return posts, nil
 }
 
-func fetchAllPosts(total int) error {
+func fetchAllPosts(total int) {
 	sections := makeSections(total)
 	fmt.Println(len(sections))
 	fmt.Println(sections)
@@ -111,16 +117,20 @@ func fetchAllPosts(total int) error {
 	start := time.Now()
 
 	var wg sync.WaitGroup
+	var mtx = &sync.Mutex{}
 	wg.Add(len(sections))
 	for _, section := range sections {
 		fmt.Println(section)
 		go func(start int, end int) {
 			defer wg.Done()
 			for start < end {
-				err := fetchPosts(start)
+				posts, err := fetchPosts(start)
 				if err != nil {
 					fmt.Println(start)
 				}
+				mtx.Lock()
+				allPosts = append(allPosts, posts...)
+				mtx.Unlock()
 				start += limit
 			}
 		}(section.From, section.To)
@@ -129,8 +139,7 @@ func fetchAllPosts(total int) error {
 
 	end := time.Now()
 	fmt.Println(end.Sub(start))
-
-	return nil
+	fmt.Println(len(allPosts))
 }
 
 func makeSections(total int) []section {
@@ -152,6 +161,21 @@ func checkErr(err error) {
 	}
 }
 
+func writePosts() error {
+	sort.Slice(allPosts, func(i, j int) bool { return allPosts[i].Date > allPosts[j].Date })
+	data, _ := json.Marshal(allPosts)
+
+	file, err := os.Create("posts.json")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	var posts bytes.Buffer
+	json.Indent(&posts, data, "", " ")
+	file.Write(posts.Bytes())
+	return nil
+}
+
 func main() {
 	blogid = os.Getenv("BLOG_IDENTIFIER")
 	apikey = os.Getenv("BLOG_API_KEY")
@@ -163,6 +187,7 @@ func main() {
 	blog, err := fetchBlog()
 	checkErr(err)
 	fmt.Println(blog)
-	err = fetchAllPosts(blog.Posts)
+	fetchAllPosts(blog.Posts)
+	err = writePosts()
 	checkErr(err)
 }
