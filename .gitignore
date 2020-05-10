@@ -21,3 +21,4 @@ _work
 # Others
 .DS_Store
 .vscode
+*.json
