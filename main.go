@@ -101,7 +101,7 @@ func fetchPosts(offset int) ([]postInfo, error) {
 		return posts, err
 	}
 	for _, post := range res.Response.Posts {
-		if post.ReblogRoot == "" && post.Notes > 0 {
+		if post.ReblogRoot == "" {
 			fmt.Println(offset, post.Slug)
 			posts = append(posts, post)
 		}
