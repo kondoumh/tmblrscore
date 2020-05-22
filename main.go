@@ -54,7 +54,7 @@ type section struct {
 	To   int
 }
 
-const delta = 500
+const delta = 2000
 const limit = 20
 
 var allPosts []postInfo
