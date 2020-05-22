@@ -24,7 +24,7 @@ export BLOG_API_KEY=<your.api.key>
 tmblrscore
 ```
 
-JSON file named `post.json` will be created. 
+JSON file named `posts.json` will be created. 
 
 Content of the JSON is something like
 
