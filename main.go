@@ -54,8 +54,8 @@ type section struct {
 	To   int
 }
 
-const delta = 2000
 const limit = 20
+const numM = 4
 
 var allPosts []postInfo
 
@@ -111,7 +111,6 @@ func fetchPosts(offset int) ([]postInfo, error) {
 
 func fetchAllPosts(total int) {
 	sections := makeSections(total)
-	fmt.Println(len(sections))
 	fmt.Println(sections)
 
 	start := time.Now()
@@ -143,15 +142,19 @@ func fetchAllPosts(total int) {
 }
 
 func makeSections(total int) []section {
-	var sections []section
+	delta := total / numM
+	fmt.Printf("Delta : %d\n", delta)
+	var sec []section
 	for start := 0; start <= total; start += delta {
 		end := start + delta - 1
 		if end >= total {
 			end = total
 		}
-		sections = append(sections, section{start, end})
+		sec = append(sec, section{start, end})
 	}
-	return sections
+	sec[numM-1].To = sec[numM].To
+	res := sec[0:numM]
+	return res
 }
 
 func checkErr(err error) {
