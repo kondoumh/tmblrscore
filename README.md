@@ -1,4 +1,5 @@
 # tmblrscore
+![Go](https://github.com/kondoumh/tmblrscore/workflows/Go/badge.svg) [![Go Report Card](https://goreportcard.com/badge/github.com/kondoumh/tmblrscore)](https://goreportcard.com/report/github.com/kondoumh/tmblrscore)
 
 Fetch your Tumblr Score(Reblog, like) via Tumblr API.
 
