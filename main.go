@@ -49,6 +49,11 @@ type postInfo struct {
 	ReblogRoot string `json:"reblogged_root_name"`
 }
 
+type snapShot struct {
+	Date  string     `json:"date"`
+	Posts []postInfo `json:"posts"`
+}
+
 type section struct {
 	From int
 	To   int
@@ -56,6 +61,7 @@ type section struct {
 
 const limit = 20
 const numM = 4
+const timeLayout = "2006-01-02-15:04"
 
 var allPosts []postInfo
 
@@ -166,7 +172,11 @@ func checkErr(err error) {
 
 func writePosts() error {
 	sort.Slice(allPosts, func(i, j int) bool { return allPosts[i].Date > allPosts[j].Date })
-	data, _ := json.Marshal(allPosts)
+	var snap snapShot
+	jst, _ := time.LoadLocation("Asia/Tokyo")
+	snap.Date = time.Now().In(jst).Format(timeLayout)
+	snap.Posts = allPosts
+	data, _ := json.Marshal(snap)
 
 	file, err := os.Create("posts.json")
 	if err != nil {
